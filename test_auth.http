@@ -53,3 +53,32 @@ Content-Type: application/json
     "employee_id": 3, 
     "manager_id": 2 
 }
+
+### Test 5: Expense Submission (Should return 201 Created)
+# Assumes your Company Base Currency is INR, and User ID 3 exists.
+POST http://127.0.0.1:5000/api/expenses
+Content-Type: application/json
+
+{
+    "user_id": 3,  
+    "amount": 100.00,
+    "currency": "USD",
+    "category": "Travel",
+    "description": "Hotel and food on business trip.",
+    "date": "2025-10-04" 
+}
+### Test 6: Employee View Own Expenses (Should return 200 OK with list)
+# Assumes Employee ID 3 exists
+GET http://127.0.0.1:5000/api/expenses/user/3
+Content-Type: application/json
+
+### Test 7: Manager Approves Expense (Should return 200 OK with new status)
+# Assumes Expense ID 1 and Manager ID 2 exist
+PATCH http://127.0.0.1:5000/api/expenses/approve/1
+Content-Type: application/json
+
+{
+    "requester_role": "Manager",
+    "manager_id": 2, 
+    "status": "Approved"
+}

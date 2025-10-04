@@ -1,8 +1,14 @@
 # app.py (CORRECTED CODE)
 import os
+import requests # ADD THIS
+from datetime import datetime # ADD THIS, needed for date conversion
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 
+# Update models import to include Expense
+from models import Company, User, Expense # <-- Make sure Expense is here
+from services.currency_service import get_currency_for_country 
+from services.exchange_service import convert_currency 
 # --- NEW: Import db from extensions.py ---
 from extensions import db 
 
@@ -185,7 +191,139 @@ def assign_manager():
         db.session.rollback()
         print(f"Error assigning manager: {e}")
         return jsonify({"message": "An error occurred during manager assignment."}), 500
+    
+# app.py (New Route: Expense Submission)
 
+@app.route('/api/expenses', methods=['POST'])
+def submit_expense():
+    data = request.get_json()
+    
+    # Authentication Placeholder: Use the user_id for submission
+    # In a real app, this would come from a JWT token in the header.
+    user_id = data.get('user_id') 
+    
+    if not user_id:
+        return jsonify({"message": "User ID is required for submission."}), 401
+
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"message": "User not found."}), 404
+        
+    # Input Data
+    try:
+        amount = data.get('amount')
+        currency = data.get('currency')
+        category = data.get('category')
+        description = data.get('description')
+        date_str = data.get('date') # Expected format YYYY-MM-DD
+
+        if not all([amount, currency, category, date_str]):
+            return jsonify({"message": "Missing required expense fields."}), 400
+
+        # 1. Get Company's Base Currency
+        company = Company.query.get(user.company_id)
+        base_currency = company.currency_code
+        
+        # 2. Convert Amount to Base Currency
+        base_amount = convert_currency(currency, base_currency, amount)
+        
+        if base_amount is None:
+            return jsonify({"message": "Could not calculate base currency amount. Check API status."}), 500
+
+        # 3. Create Expense Record
+        new_expense = Expense(
+            amount=float(amount),
+            currency=currency,
+            base_amount=base_amount,
+            category=category,
+            description=description,
+            # Convert date string to date object for PostgreSQL
+            date=datetime.strptime(date_str, '%Y-%m-%d').date(), 
+            user_id=user_id,
+            company_id=user.company_id
+        )
+        
+        db.session.add(new_expense)
+        db.session.commit()
+        
+        return jsonify({
+            "message": "Expense submitted successfully and base currency calculated.",
+            "expense_id": new_expense.id,
+            "submitted_amount": float(amount),
+            "submitted_currency": currency,
+            "base_amount": base_amount,
+            "base_currency": base_currency
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error submitting expense: {e}")
+        return jsonify({"message": "An error occurred during expense submission."}), 500
+    
+@app.route('/api/expenses/user/<int:user_id>', methods=['GET'])
+def get_user_expenses(user_id):
+    # This route retrieves all expenses submitted by a specific user.
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"message": "User not found."}), 404
+
+    # Fetch expenses for the user, ordered by date (newest first)
+    expenses = Expense.query.filter_by(user_id=user_id).order_by(Expense.date.desc()).all()
+    
+    output = []
+    for expense in expenses:
+        output.append({
+            'id': expense.id,
+            'amount': float(expense.amount),
+            'currency': expense.currency,
+            'base_amount': float(expense.base_amount),
+            'base_currency': user.company.currency_code,
+            'category': expense.category,
+            'description': expense.description,
+            'date': expense.date.strftime('%Y-%m-%d'),
+            'status': expense.status
+        })
+
+    return jsonify(output), 200
+
+@app.route('/api/expenses/approve/<int:expense_id>', methods=['PATCH'])
+def update_expense_status(expense_id):
+    data = request.get_json()
+    
+    # Placeholder for authorization check
+    requester_role = data.get('requester_role') 
+    # In a real app, manager_id is verified to be the user's actual manager.
+    manager_id = data.get('manager_id') 
+
+    if requester_role not in ['Admin', 'Manager']:
+        return jsonify({"message": "Permission denied. Manager or Admin access required."}), 403
+
+    new_status = data.get('status') 
+    if new_status not in ['Approved', 'Rejected']:
+        return jsonify({"message": "Invalid status. Must be 'Approved' or 'Rejected'."}), 400
+
+    expense = Expense.query.get(expense_id)
+    if not expense:
+        return jsonify({"message": "Expense not found."}), 404
+
+    # Simple check: Ensure the requester is not approving their own expense
+    if expense.user_id == manager_id:
+        return jsonify({"message": "Managers cannot approve or reject their own expenses."}), 403
+
+    try:
+        expense.status = new_status
+        db.session.commit()
+        
+        return jsonify({
+            "message": f"Expense ID {expense_id} status updated to {new_status}.",
+            "new_status": new_status,
+            "approved_by": manager_id
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error updating expense status: {e}")
+        return jsonify({"message": "Could not update expense status."}), 500
 
 # --- Server Start and Database Setup ---
 if __name__ == '__main__':

@@ -29,3 +29,28 @@ class User(db.Model):
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+    
+class Expense(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Expense Details
+    amount = db.Column(db.Numeric(10, 2), nullable=False) # Submitted amount
+    currency = db.Column(db.String(3), nullable=False)    # Submitted currency (e.g., USD, EUR)
+    
+    # Converted Amount (Crucial for company financials)
+    base_amount = db.Column(db.Numeric(10, 2), nullable=False)
+    
+    category = db.Column(db.String(50), nullable=False)
+    description = db.Column(db.String(255))
+    date = db.Column(db.Date, nullable=False)
+    
+    # Status and Approval Flow
+    status = db.Column(db.String(20), default='Pending', nullable=False) # Pending, Approved, Rejected
+    
+    # Foreign Keys
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    company_id = db.Column(db.Integer, db.ForeignKey('company.id'), nullable=False)
+
+    # Relationships (Optional but good practice)
+    user = db.relationship('User', backref='expenses')
+    company = db.relationship('Company', backref='company_expenses')
