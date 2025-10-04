@@ -3,6 +3,7 @@ import os
 import requests # ADD THIS
 from datetime import datetime # ADD THIS, needed for date conversion
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from dotenv import load_dotenv
 
 # Update models import to include Expense
@@ -16,9 +17,15 @@ from extensions import db
 
 # Load environment variables
 load_dotenv()
-
-# --- Initialization & Configuration ---
 app = Flask(__name__)
+
+CORS(app)
+# --- Initialization & Configuration ---
+CORS(app, 
+     resources={r"/api/*": {"origins": "*"}},
+     allow_headers=["Content-Type", "Authorization"],
+     methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+     supports_credentials=False)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -104,6 +111,33 @@ def login():
             "company_id": user.company_id
         }), 200
 
+@app.route('/api/admin/users', methods=['GET'])
+def get_all_users():
+    # Get company_id from query params or use authorization
+    company_id = request.args.get('company_id')
+    
+    if not company_id:
+        return jsonify({"message": "Company ID is required."}), 400
+    
+    try:
+        users = User.query.filter_by(company_id=company_id).all()
+        
+        output = []
+        for user in users:
+            output.append({
+                'id': user.id,
+                'email': user.email,
+                'full_name': user.full_name,
+                'role': user.role,
+                'manager_id': user.manager_id
+            })
+        
+        return jsonify(output), 200
+        
+    except Exception as e:
+        print(f"Error fetching users: {e}")
+        return jsonify({"message": "Could not fetch users."}), 500
+
 @app.route('/api/admin/user', methods=['POST'])
 def create_user():
     data = request.get_json()
@@ -148,6 +182,76 @@ def create_user():
         db.session.rollback()
         print(f"Error creating user: {e}")
         return jsonify({"message": "Could not create user."}), 500
+
+@app.route('/api/expenses/company/<int:company_id>', methods=['GET'])
+def get_company_expenses(company_id):
+    try:
+        expenses = Expense.query.filter_by(company_id=company_id).all()
+        
+        output = []
+        for expense in expenses:
+            output.append({
+                'id': expense.id,
+                'amount': float(expense.amount),
+                'status': expense.status
+            })
+        
+        return jsonify(output), 200
+        
+    except Exception as e:
+        print(f"Error fetching company expenses: {e}")
+        return jsonify({"message": "Could not fetch expenses."}), 500
+    
+@app.route('/api/expenses/pending', methods=['GET'])
+def get_pending_expenses():
+    company_id = request.args.get('company_id')
+    manager_id = request.args.get('manager_id')  # Add this
+    
+    if not company_id:
+        return jsonify({"message": "Company ID is required."}), 400
+    
+    try:
+        # If manager_id is provided, filter by their direct reports only
+        if manager_id:
+            # Get all employees who report to this manager
+            employees = User.query.filter_by(manager_id=manager_id).all()
+            employee_ids = [emp.id for emp in employees]
+            
+            expenses = Expense.query.filter(
+                Expense.company_id == company_id,
+                Expense.status == 'Pending',
+                Expense.user_id.in_(employee_ids)
+            ).order_by(Expense.date.desc()).all()
+        else:
+            # Admin sees all pending expenses
+            expenses = Expense.query.filter_by(
+                company_id=company_id,
+                status='Pending'
+            ).order_by(Expense.date.desc()).all()
+        
+        output = []
+        for expense in expenses:
+            user = User.query.get(expense.user_id)
+            output.append({
+                'id': expense.id,
+                'amount': float(expense.amount),
+                'currency': expense.currency,
+                'base_amount': float(expense.base_amount),
+                'base_currency': user.company.currency_code,
+                'category': expense.category,
+                'description': expense.description,
+                'date': expense.date.strftime('%Y-%m-%d'),
+                'status': expense.status,
+                'user_name': user.full_name,
+                'user_id': user.id
+            })
+        
+        return jsonify(output), 200
+        
+    except Exception as e:
+        print(f"Error fetching pending expenses: {e}")
+        return jsonify({"message": "Could not fetch pending expenses."}), 500
+    
 @app.route('/api/admin/assign-manager', methods=['PATCH'])
 def assign_manager():
     data = request.get_json()
