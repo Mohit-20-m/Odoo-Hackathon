@@ -1,0 +1,55 @@
+### Test 1: Initial Admin Sign-up (Should return 201 Created)
+POST http://127.0.0.1:5000/api/signup
+Content-Type: application/json
+
+{
+    "email": "admin@testcorp.com",
+    "password": "SuperSecretPassword",
+    "full_name": "Mo Admin",
+    "company_name": "Test Global",
+    "country": "India" 
+}
+
+### Test 2: User Login (Should return 200 OK)
+POST http://127.0.0.1:5000/api/login
+Content-Type: application/json
+
+{
+    "email": "admin@testcorp.com",
+    "password": "SuperSecretPassword"
+}
+
+### Test 3: Admin Create Manager (Should return 201 Created)
+POST http://127.0.0.1:5000/api/admin/user
+Content-Type: application/json
+
+{
+    "requester_role": "Admin",
+    "email": "manager@testcorp.com",
+    "password": "mgr_password",
+    "full_name": "Bob Manager",
+    "role": "Manager",
+    "company_id": 1 
+}
+### Test 3: Admin Create Employee (Should return 201 Created)
+POST http://127.0.0.1:5000/api/admin/user
+Content-Type: application/json
+
+{
+    "requester_role": "Admin",
+    "email": "employee1@testcorp.com",
+    "password": "emp_password",
+    "full_name": "Alice Employee",
+    "role": "Employee",
+    "company_id": 1 
+}
+### Test 4: Assign Manager to Employee (Should return 200 OK)
+# NOTE: Ensure Manager ID (2) and Employee ID (3) exist in your DB.
+PATCH http://127.0.0.1:5000/api/admin/assign-manager
+Content-Type: application/json
+
+{
+    "requester_role": "Admin",
+    "employee_id": 3, 
+    "manager_id": 2 
+}

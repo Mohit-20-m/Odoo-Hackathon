@@ -1,0 +1,11 @@
+# .gitignore
+
+# Python virtual environment folder
+venv/
+
+# Python compiled files
+__pycache__/
+*.pyc
+
+# CRITICAL: Security/Configuration files must be ignored
+.env
