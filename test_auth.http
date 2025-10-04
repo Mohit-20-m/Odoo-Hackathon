@@ -82,3 +82,10 @@ Content-Type: application/json
     "manager_id": 2, 
     "status": "Approved"
 }
+### Test 10: OCR Receipt Processing (Check for successful connection)
+POST http://127.0.0.1:5000/api/ocr/process
+Content-Type: application/json
+
+{
+    "image_data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" 
+}

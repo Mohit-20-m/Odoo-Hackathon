@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 from models import Company, User, Expense # <-- Make sure Expense is here
 from services.currency_service import get_currency_for_country 
 from services.exchange_service import convert_currency 
+from services.exchange_service import convert_currency
+from services.ocr_service import extract_text_from_image
 # --- NEW: Import db from extensions.py ---
 from extensions import db 
 
@@ -324,6 +326,39 @@ def update_expense_status(expense_id):
         db.session.rollback()
         print(f"Error updating expense status: {e}")
         return jsonify({"message": "Could not update expense status."}), 500
+    
+@app.route('/api/ocr/process', methods=['POST'])
+def process_receipt_ocr():
+    data = request.get_json()
+    image_data_b64 = data.get('image_data') # Base64 encoded string
+
+    if not image_data_b64:
+        return jsonify({"message": "Base64 image data is required."}), 400
+
+    # Call the OCR service
+    ocr_result = extract_text_from_image(image_data_b64)
+
+    if "error" in ocr_result:
+        return jsonify(ocr_result), 500
+
+    # Optionally, calculate the base amount for the suggested currency
+    suggested_amount = ocr_result.get('suggested_amount')
+    suggested_currency = ocr_result.get('suggested_currency')
+    
+    # We need a user to determine the company's base currency for conversion
+    # For a quick demo, let's assume Company ID 1 has the base currency
+    try:
+        company = Company.query.get(1)
+        base_currency = company.currency_code
+    except:
+        base_currency = "USD" # Fallback
+
+    if suggested_amount and suggested_currency and suggested_currency != base_currency:
+        base_amount = convert_currency(suggested_currency, base_currency, suggested_amount)
+        ocr_result['base_amount_calculated'] = base_amount
+        ocr_result['base_currency'] = base_currency
+
+    return jsonify(ocr_result), 200
 
 # --- Server Start and Database Setup ---
 if __name__ == '__main__':

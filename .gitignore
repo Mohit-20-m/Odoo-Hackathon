@@ -9,3 +9,5 @@ __pycache__/
 
 # CRITICAL: Security/Configuration files must be ignored
 .env
+# CRITICAL: Ignores all JSON files, including the service account key
+*.json
