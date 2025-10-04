@@ -653,7 +653,7 @@ function SubmitExpense({ user, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [useOCR, setUseOCR] = useState(false);
 
-  const categories = ['Travel', 'Food', 'Lodging', 'Miscellaneous', 'Office Supplies'];
+  const categories = ['Travel', 'Food', 'Lodging', 'Miscellaneous', 'Office Supplies', 'Home', 'Entertainment', 'Health', 'Education', 'Utilities'];
   const currencies = ['USD', 'EUR', 'GBP', 'INR', 'JPY', 'AUD', 'CAD'];
 
   const handleSubmit = async (e) => {
